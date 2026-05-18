@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api, type Job, type PdfUploadResult, type ScrapeResult } from '../lib/api';
+import { api, type ImageZipUploadResult, type Job, type ScrapeResult } from '../lib/api';
 import { StatusPill } from '../components/StatusPill';
 
 export default function Dashboard() {
@@ -10,7 +10,7 @@ export default function Dashboard() {
   const [lastResult, setLastResult] = useState<ScrapeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [pdfResult, setPdfResult] = useState<PdfUploadResult | null>(null);
+  const [uploadResult, setUploadResult] = useState<ImageZipUploadResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function load() {
@@ -47,15 +47,15 @@ export default function Dashboard() {
     }
   }
 
-  async function handlePdfChange(e: React.ChangeEvent<HTMLInputElement>) {
+  async function handleZipChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(true);
     setError(null);
-    setPdfResult(null);
+    setUploadResult(null);
     try {
-      const result = await api.uploadPdf(file);
-      setPdfResult(result);
+      const result = await api.uploadImageZip(file);
+      setUploadResult(result);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -93,30 +93,34 @@ export default function Dashboard() {
         </div>
       )}
 
-      {pdfResult && (
+      {uploadResult && (
         <div className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-          PDF imported as Post #{pdfResult.postId} — {pdfResult.pageCount} page(s).{' '}
+          Imported as Post #{uploadResult.postId} — {uploadResult.imageCount} image(s).{' '}
           <Link to="/review" className="underline">Review and publish</Link>
         </div>
       )}
 
       <div className="mb-6 rounded border bg-white p-4">
-        <h3 className="text-sm font-semibold mb-2">Import PDF</h3>
+        <h3 className="text-sm font-semibold mb-2">Import image gallery (.zip)</h3>
         <p className="mb-2 text-xs text-slate-500">
-          Renders each page as an image and uploads to WordPress as a draft post.
-          Max 30 pages, 15 MB. On the free Render tier large PDFs may time out — aim for ≤15 pages.
+          Upload a <code className="font-mono">.zip</code> of images (PNG, JPG, WebP, GIF) — each image becomes one block in the WordPress draft, in filename order.
+          Max 50 images, 25 MB.
+        </p>
+        <p className="mb-2 text-xs text-slate-500">
+          <strong>For a PDF:</strong> open it in Preview / Acrobat → export each page as an image → zip the folder → upload here.
+          Page order follows natural filename sort (so name files <code className="font-mono">page-01.png</code>, <code className="font-mono">page-02.png</code>…).
         </p>
         <input
           ref={fileInputRef}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/zip,.zip"
           disabled={uploading}
-          onChange={handlePdfChange}
+          onChange={handleZipChange}
           className="block text-sm file:mr-3 file:rounded file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700 file:disabled:opacity-50"
         />
         {uploading && (
           <p className="mt-2 text-xs text-slate-500">
-            Uploading and rendering pages… can take 30–120 s for larger PDFs.
+            Uploading images to WordPress… can take 30–120 s for large galleries.
           </p>
         )}
       </div>

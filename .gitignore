@@ -8,3 +8,8 @@ build/
 .DS_Store
 *.log
 backend/storage/
+
+# Test fixtures / scratch files at repo root — never commit
+*.pdf
+*.zip
+test-fixtures/

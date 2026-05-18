@@ -11,9 +11,9 @@ export type Source = {
   createdAt: string;
 };
 
-export type PdfUploadResult = {
+export type ImageZipUploadResult = {
   postId: number;
-  pageCount: number;
+  imageCount: number;
   title: string;
 };
 
@@ -233,15 +233,15 @@ export const api = {
     }),
   deleteSource: (id: number) =>
     request<null>(`/sources/${id}`, { method: 'DELETE' }),
-  uploadPdf: async (file: File): Promise<PdfUploadResult> => {
+  uploadImageZip: async (file: File): Promise<ImageZipUploadResult> => {
     const form = new FormData();
     form.append('file', file);
     let res: Response;
     try {
-      res = await fetch(`${BASE}/pdf/upload`, { method: 'POST', body: form });
+      res = await fetch(`${BASE}/image-zip/upload`, { method: 'POST', body: form });
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      throw new Error(`/pdf/upload: backend unreachable (${msg})`);
+      throw new Error(`/image-zip/upload: backend unreachable (${msg})`);
     }
     const text = await res.text();
     let data: unknown = null;
@@ -257,8 +257,8 @@ export const api = {
       ) {
         throw new Error((data as { error: string }).error);
       }
-      throw new Error(`/pdf/upload: HTTP ${res.status}`);
+      throw new Error(`/image-zip/upload: HTTP ${res.status}`);
     }
-    return data as PdfUploadResult;
+    return data as ImageZipUploadResult;
   },
 };
