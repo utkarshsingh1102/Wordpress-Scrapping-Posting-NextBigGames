@@ -2,6 +2,21 @@ const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api`;
 
 export type Health = { ok: boolean; time: string };
 
+export type Source = {
+  id: number;
+  name: string;
+  homepageUrl: string;
+  enabled: boolean;
+  lastScrapedAt: string | null;
+  createdAt: string;
+};
+
+export type PdfUploadResult = {
+  postId: number;
+  pageCount: number;
+  title: string;
+};
+
 export type PostStatus = 'scraped' | 'published' | 'discarded';
 
 export type PostSummary = {
@@ -205,4 +220,45 @@ export const api = {
       body: JSON.stringify(updates),
     }),
   testWp: () => request<WpTestResult>('/wp/test'),
+  listSources: () => request<Source[]>('/sources'),
+  createSource: (name: string, homepageUrl: string) =>
+    request<Source>('/sources', {
+      method: 'POST',
+      body: JSON.stringify({ name, homepageUrl }),
+    }),
+  updateSource: (id: number, updates: { name?: string; enabled?: boolean }) =>
+    request<Source>(`/sources/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(updates),
+    }),
+  deleteSource: (id: number) =>
+    request<null>(`/sources/${id}`, { method: 'DELETE' }),
+  uploadPdf: async (file: File): Promise<PdfUploadResult> => {
+    const form = new FormData();
+    form.append('file', file);
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}/pdf/upload`, { method: 'POST', body: form });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`/pdf/upload: backend unreachable (${msg})`);
+    }
+    const text = await res.text();
+    let data: unknown = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      /* non-JSON */
+    }
+    if (!res.ok) {
+      if (
+        data && typeof data === 'object' && 'error' in data &&
+        typeof (data as { error: unknown }).error === 'string'
+      ) {
+        throw new Error((data as { error: string }).error);
+      }
+      throw new Error(`/pdf/upload: HTTP ${res.status}`);
+    }
+    return data as PdfUploadResult;
+  },
 };

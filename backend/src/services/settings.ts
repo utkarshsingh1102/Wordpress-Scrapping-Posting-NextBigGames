@@ -122,20 +122,47 @@ export async function updateSettings(
 
 export async function autoMigrateFromEnv(): Promise<void> {
   const existing = await prisma.settings.findUnique({ where: { id: 1 } });
-  if (existing) return;
+  if (!existing) {
+    const data: Record<string, unknown> = { id: 1 };
+    data.sourceUrl = config.sourceUrl;
+    if (config.wp.url) data.wpUrl = config.wp.url;
+    if (config.wp.username) data.wpUsername = config.wp.username;
+    if (config.wp.appPassword) {
+      data.wpAppPasswordEnc = encrypt(config.wp.appPassword, key());
+    }
+    data.scrapeCron = config.scrape.cron;
+    data.scrapeCronEnabled = config.scrape.cronEnabled;
 
-  const data: Record<string, unknown> = { id: 1 };
-  data.sourceUrl = config.sourceUrl;
-  if (config.wp.url) data.wpUrl = config.wp.url;
-  if (config.wp.username) data.wpUsername = config.wp.username;
-  if (config.wp.appPassword) {
-    data.wpAppPasswordEnc = encrypt(config.wp.appPassword, key());
+    await prisma.settings.create({ data: data as never });
+    console.log('[settings] migrated initial values from .env to encrypted DB');
   }
-  data.scrapeCron = config.scrape.cron;
-  data.scrapeCronEnabled = config.scrape.cronEnabled;
 
-  await prisma.settings.create({ data: data as never });
-  console.log('[settings] migrated initial values from .env to encrypted DB');
+  // v2 backfill: if there are no Sources yet, seed one from the legacy
+  // sourceUrl + attach any unlinked Posts to it. Idempotent — early-returns
+  // once a Source exists.
+  const sourceCount = await prisma.source.count();
+  if (sourceCount > 0) return;
+
+  const legacyUrl = existing?.sourceUrl ?? config.sourceUrl;
+  if (!legacyUrl) return;
+
+  let name = 'Default source';
+  try {
+    name = new URL(legacyUrl).hostname.replace(/^www\./, '');
+  } catch {
+    /* keep default name */
+  }
+
+  const seeded = await prisma.source.create({
+    data: { name, homepageUrl: legacyUrl, enabled: true },
+  });
+  const linked = await prisma.post.updateMany({
+    where: { sourceSiteId: null },
+    data: { sourceSiteId: seeded.id },
+  });
+  console.log(
+    `[settings] seeded default Source "${name}" and linked ${linked.count} existing post(s).`,
+  );
 }
 
 export function invalidateCache(): void {

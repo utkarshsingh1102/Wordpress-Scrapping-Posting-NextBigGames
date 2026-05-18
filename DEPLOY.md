@@ -124,17 +124,31 @@ If you outgrow this:
 
 ---
 
-## Local development now that we're on Postgres
+## Local development — isolate dev DB from prod (Neon branches)
 
-You can no longer just `npm run dev` without a Postgres. Either:
-- Use the same Neon database for dev (separate `branch` in Neon: free + isolates data).
-- Run a local Postgres via Docker:
-  ```bash
-  docker run -d --name pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:16
-  ```
-  Then set `DATABASE_URL=postgresql://postgres:dev@localhost:5432/postgres` in `backend/.env`.
+You can no longer just `npm run dev` without a Postgres. The recommended setup is a **Neon branch** so your local work doesn't write to production data:
 
-Either way, run `npx prisma db push` once to create the tables, then `npm run dev` as normal.
+1. Open the Neon console → your project (`wordpress-scrape-posting`).
+2. Click **Branches** (left nav) → **Create branch**.
+3. Name: `dev`. Parent: `main`. **Create branch**.
+4. Click the new `dev` branch → copy its **Connection string** (looks identical to main but the host has a different `ep-...` prefix).
+5. Edit `backend/.env` locally → set `DATABASE_URL="<that dev connection string>"`.
+6. `cd backend && npx prisma db push` → applies the schema to the dev branch.
+7. `npm run dev` — local backend now reads/writes the `dev` branch, completely isolated from production.
+
+Branches in Neon are **copy-on-write** — they share storage until you diverge, so a dev branch is effectively free.
+
+### Alternative: local Postgres via Docker
+
+```bash
+docker run -d --name pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:17
+```
+
+Set `DATABASE_URL=postgresql://postgres:dev@localhost:5432/postgres` in `backend/.env`, then `npx prisma db push`.
+
+### Render keeps pointing at `main`
+
+Your Render service has the production connection string in its env vars and never sees `backend/.env`. As long as you only change the *local* `.env`, production is untouched.
 
 ---
 

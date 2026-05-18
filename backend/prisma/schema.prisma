@@ -27,6 +27,21 @@ model Post {
   originalFeaturedImage String?
   generatedImagePath String?
   generatedImagePrompt String?
+  source            String?   @default("scrape")
+  sourceSiteId      Int?
+  sourceSite        Source?   @relation(fields: [sourceSiteId], references: [id], onDelete: SetNull)
+
+  @@index([sourceSiteId])
+}
+
+model Source {
+  id            Int       @id @default(autoincrement())
+  name          String
+  homepageUrl   String    @unique
+  enabled       Boolean   @default(true)
+  lastScrapedAt DateTime?
+  createdAt     DateTime  @default(now())
+  posts         Post[]
 }
 
 model Job {
