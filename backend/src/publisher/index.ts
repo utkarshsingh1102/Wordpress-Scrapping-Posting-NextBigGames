@@ -9,7 +9,11 @@ import {
 } from '../wp/client';
 import { shouldSkipImage } from '../wp/imageFilter';
 import { withRetry } from '../util/retry';
-import { getEffectiveSettings } from '../services/settings';
+import { centerAlignImages } from '../scraper/cleaner';
+
+// Hard invariant: every post this app publishes is attributed to this WP user.
+// Overrides any value set via Settings → wp.authorUsername.
+const REQUIRED_WP_AUTHOR_USERNAME = 'nextbiggames';
 
 const MIME_EXT: Record<string, string> = {
   'image/jpeg': '.jpg',
@@ -98,10 +102,16 @@ export async function publishPost(postId: number): Promise<PublishResult> {
   }
 
   // Resolve author up-front so we fail fast before any media uploads.
-  const settings = await getEffectiveSettings();
-  let authorId: number | undefined;
-  if (settings.wp.authorUsername) {
-    authorId = await resolveAuthorId(settings.wp.authorUsername);
+  // Author is forced to REQUIRED_WP_AUTHOR_USERNAME — Settings is ignored on
+  // purpose, since this is a hard requirement for every post.
+  let authorId: number;
+  try {
+    authorId = await resolveAuthorId(REQUIRED_WP_AUTHOR_USERNAME);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      `Cannot publish: required WP author "${REQUIRED_WP_AUTHOR_USERNAME}" not found on the site (${msg}). Create that user in WordPress before publishing.`,
+    );
   }
 
   let featuredMedia: WpMedia | null = null;
@@ -142,6 +152,9 @@ export async function publishPost(postId: number): Promise<PublishResult> {
   for (const [oldUrl, newUrl] of Object.entries(urlMap)) {
     bodyHtml = bodyHtml.split(oldUrl).join(newUrl);
   }
+  // Publish-time invariant: every <img> in the body is center-aligned. Safe to
+  // call even on bodies already centered (the helper is idempotent).
+  bodyHtml = centerAlignImages(bodyHtml);
 
   const wpPost = await createPost({
     title: post.title,
