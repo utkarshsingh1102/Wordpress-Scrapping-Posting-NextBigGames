@@ -114,7 +114,7 @@ router.post('/image-zip/upload', upload.single('file'), async (req, res) => {
     return;
   }
   const bodyHtml = uploaded
-    .map(({ sourceUrl }) => `<p><img src="${sourceUrl}" alt="" /></p>`)
+    .map(({ sourceUrl }) => `<p style="text-align: center;"><img src="${sourceUrl}" alt="" /></p>`)
     .join('\n');
   const images = uploaded.map((u) => u.sourceUrl);
   const featuredImage = images[0] ?? null;
