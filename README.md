@@ -12,12 +12,12 @@ Scrapes the latest posts from [Gamigion](https://www.gamigion.com/) and republis
 ## Setup
 
 ```bash
-# Backend
+# Backend (requires a Postgres connection — local Docker or a free Neon DB)
 cd backend
-cp .env.example .env
+cp .env.example .env       # then fill in DATABASE_URL (postgres connection string)
 npm install
-npx prisma migrate dev    # creates dev.db
-npm run dev               # http://localhost:3001
+npx prisma db push         # creates schema in your Postgres
+npm run dev                # http://localhost:3001
 
 # Frontend (in a separate terminal)
 cd frontend
