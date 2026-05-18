@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.env
+.cred-key
+*.db
+*.db-journal
+prisma/migrations/dev/

@@ -1,0 +1,59 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Post {
+  id                Int       @id @default(autoincrement())
+  sourceUrl         String    @unique
+  title             String
+  slug              String
+  author            String?
+  publishedAt       DateTime?
+  category          String?
+  featuredImage     String?
+  bodyHtml          String
+  rewrittenBodyHtml String?
+  imagesJson        String    @default("[]")
+  linksJson         String    @default("[]")
+  status            String    @default("scraped")
+  wpPostId          Int?
+  scrapedAt         DateTime  @default(now())
+  wpPublishedAt     DateTime?
+  originalFeaturedImage String?
+  generatedImagePath String?
+  generatedImagePrompt String?
+}
+
+model Job {
+  id             Int       @id @default(autoincrement())
+  type           String
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  status         String
+  postsFound     Int       @default(0)
+  postsScraped   Int       @default(0)
+  postsPublished Int       @default(0)
+  postsSkipped   Int       @default(0)
+  errorLog       String?
+}
+
+model Settings {
+  id                  Int      @id @default(autoincrement())
+  sourceUrl           String?
+  wpUrl               String?
+  wpUsername          String?
+  wpAppPasswordEnc    String?
+  wpAuthorUsername    String?
+  anthropicApiKeyEnc  String?
+  rewriteEnabled      Boolean?
+  rewriteModel        String?
+  openaiApiKeyEnc     String?
+  scrapeCron          String?
+  scrapeCronEnabled   Boolean?
+  updatedAt           DateTime @updatedAt
+}
