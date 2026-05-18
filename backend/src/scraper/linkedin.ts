@@ -159,6 +159,53 @@ function textToHtml(text: string): string {
     .join('\n');
 }
 
+// LinkedIn wraps every outbound link in
+//   https://www.linkedin.com/redir/redirect?url=<ENCODED>&urlhash=...&trk=...
+// Unwrap to the real destination so the published post links go where they should.
+function unwrapLinkedInRedirects(html: string): string {
+  if (!html) return html;
+  const $ = load(`<div id="__lir">${html}</div>`);
+  $('#__lir a[href]').each((_, el) => {
+    const $a = $(el);
+    const href = $a.attr('href');
+    if (!href) return;
+    const m = /linkedin\.com\/redir\/redirect\?(?:[^#]*&)?url=([^&#]+)/i.exec(href);
+    if (m) {
+      try {
+        $a.attr('href', decodeURIComponent(m[1]));
+      } catch {
+        // leave original href if decoding fails
+      }
+    }
+    $a.removeAttr('data-tracking-control-name')
+      .removeAttr('data-tracking-will-navigate')
+      .removeAttr('data-test-link');
+  });
+  return $('#__lir').html() ?? html;
+}
+
+// Drop the per-block wrapper attributes LinkedIn emits on every paragraph /
+// list / image block, plus empty <p></p> placeholders that pad the markup.
+function tidyLinkedInBlocks(html: string): string {
+  if (!html) return html;
+  const $ = load(`<div id="__lb">${html}</div>`);
+  // Remove the test-id attribute so WP doesn't store LinkedIn-internal markers.
+  $('#__lb [data-test-id]').removeAttr('data-test-id');
+  // Empty paragraphs LinkedIn renders around every heading.
+  $('#__lb p').each((_, el) => {
+    const $p = $(el);
+    if ($p.children().length === 0 && $p.text().trim() === '') $p.remove();
+  });
+  // Strip empty <span> wrappers that survive (LinkedIn nests <span> inside
+  // every list item even when the span is the only child).
+  $('#__lb span').each((_, el) => {
+    const $s = $(el);
+    if ($s.attr('class') || $s.attr('style')) return;
+    $s.replaceWith($s.contents());
+  });
+  return $('#__lb').html() ?? html;
+}
+
 function collectImagesAndLinks(bodyHtml: string): { images: string[]; links: string[] } {
   const $ = load(`<div id="__b">${bodyHtml}</div>`);
   const images: string[] = [];
@@ -192,8 +239,15 @@ export async function fetchLinkedInArticle(url: string): Promise<ScrapedArticle>
   const docTitle = $('title').first().text().trim() || null;
   const title = (ogTitle ?? docTitle ?? ld?.headline ?? 'Untitled').trim() || 'Untitled';
 
-  const featuredImage =
-    pickImage(ld?.image) ?? getFirstMeta($, 'property', 'og:image') ?? null;
+  // Cover image — JSON-LD image / og:image / the <img class="cover-img__image">
+  // element on the page (LinkedIn renders the cover outside the
+  // article-content-blocks container, so it's never inside the body we extract).
+  const coverImgFromDom = $('img.cover-img__image').first().attr('src') ?? null;
+  let featuredImage =
+    pickImage(ld?.image) ??
+    getFirstMeta($, 'property', 'og:image') ??
+    coverImgFromDom ??
+    null;
 
   const publishedRaw =
     ld?.datePublished ?? getFirstMeta($, 'property', 'article:published_time');
@@ -205,13 +259,21 @@ export async function fetchLinkedInArticle(url: string): Promise<ScrapedArticle>
     null;
 
   // Body extraction.
-  // 1) Prefer JSON-LD articleBody when it's HTML-ish.
-  // 2) Fall back to Readability on the page HTML.
-  // 3) Final fallback: plain-text articleBody promoted to paragraphs.
+  // 1) Prefer the explicit LinkedIn content container — it's just the article
+  //    body, no author card / "Explore content categories" / "More articles by
+  //    this author" sections that Readability happily includes.
+  // 2) Fall back to JSON-LD articleBody when it's HTML-ish.
+  // 3) Then Readability on the page HTML.
+  // 4) Final fallback: plain-text articleBody promoted to paragraphs.
   let bodyHtml = '';
-  if (ld?.articleBody && /<\w+[^>]*>/.test(ld.articleBody)) {
+  const contentBlocks = $('[data-test-id="article-content-blocks"]').first();
+  if (contentBlocks.length > 0) {
+    bodyHtml = contentBlocks.html()?.trim() ?? '';
+  }
+  if (!bodyHtml && ld?.articleBody && /<\w+[^>]*>/.test(ld.articleBody)) {
     bodyHtml = ld.articleBody;
-  } else {
+  }
+  if (!bodyHtml) {
     const dom = new JSDOM(html, { url });
     const parsed = new Readability(dom.window.document).parse();
     if (parsed?.content && parsed.content.trim().length > 0) {
@@ -240,6 +302,8 @@ export async function fetchLinkedInArticle(url: string): Promise<ScrapedArticle>
     bodyHtml = body$('#__body').html()?.trim() ?? '';
   }
 
+  bodyHtml = unwrapLinkedInRedirects(bodyHtml);
+  bodyHtml = tidyLinkedInBlocks(bodyHtml);
   bodyHtml = cleanBodyHtml(bodyHtml);
 
   if (!bodyHtml) {
@@ -248,7 +312,23 @@ export async function fetchLinkedInArticle(url: string): Promise<ScrapedArticle>
     );
   }
 
-  const { images, links } = collectImagesAndLinks(bodyHtml);
+  let { images, links } = collectImagesAndLinks(bodyHtml);
+
+  // If no cover image was set but the body has images, promote the first one.
+  if (!featuredImage && images.length > 0) {
+    featuredImage = images[0];
+  }
+
+  // LinkedIn renders the cover image outside the article body. WP themes
+  // usually display the featured image, but to guarantee the image is visible
+  // on the public post page we also prepend it as a <figure> at the top of the
+  // body. The publisher uploads the image once (deduped via urlMap) and
+  // rewrites the src to the WP-hosted URL.
+  if (featuredImage && !images.includes(featuredImage)) {
+    const safe = featuredImage.replace(/"/g, '&quot;');
+    bodyHtml = `<figure class="aligncenter"><img src="${safe}" alt="" /></figure>\n${bodyHtml}`;
+    images = [featuredImage, ...images];
+  }
 
   return {
     sourceUrl: url,
