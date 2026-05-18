@@ -22,6 +22,7 @@ export type PostStatus = 'scraped' | 'published' | 'discarded';
 export type PostSummary = {
   id: number;
   sourceUrl: string;
+  sourceName: string | null;
   title: string;
   slug: string;
   author: string | null;
@@ -86,6 +87,47 @@ export type Settings = {
     cronEnabled: boolean;
   };
 };
+
+export type LinkedinNewsletter = {
+  id: number;
+  name: string;
+  url: string;
+  lastScrapedAt: string | null;
+  createdAt: string;
+};
+
+export type LinkedInEditionResult =
+  | { url: string; ok: true; created: boolean; postId: number; title: string }
+  | { url: string; ok: false; error: string };
+
+export type LinkedInNewsletterScrapeResult = {
+  newsletterId: number | null;
+  newsletterUrl: string;
+  ok: boolean;
+  error?: string;
+  editionsFound: number;
+  results: LinkedInEditionResult[];
+  summary: { total: number; created: number; existed: number; failed: number };
+};
+
+export type LinkedInScrapeAllResult = {
+  newsletters: LinkedInNewsletterScrapeResult[];
+  summary: {
+    newsletters: number;
+    total: number;
+    created: number;
+    existed: number;
+    failed: number;
+  };
+};
+
+export type LinkedInScrapeResult =
+  | ({ mode: 'newsletter' } & LinkedInNewsletterScrapeResult)
+  | {
+      mode: 'article';
+      created: boolean;
+      post: { id: number; title: string; status: string };
+    };
 
 export type WpTestResult = {
   ok: boolean;
@@ -171,6 +213,26 @@ export const api = {
       '/scrape-url',
       { method: 'POST', body: JSON.stringify({ url }) },
     ),
+  scrapeLinkedIn: (url: string) =>
+    request<LinkedInScrapeResult>('/linkedin/scrape', {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    }),
+  listLinkedInNewsletters: () =>
+    request<{ newsletters: LinkedinNewsletter[] }>('/linkedin/newsletters'),
+  addLinkedInNewsletter: (url: string, name?: string) =>
+    request<LinkedinNewsletter>('/linkedin/newsletters', {
+      method: 'POST',
+      body: JSON.stringify({ url, name }),
+    }),
+  deleteLinkedInNewsletter: (id: number) =>
+    request<{ ok: boolean }>(`/linkedin/newsletters/${id}`, { method: 'DELETE' }),
+  scrapeLinkedInNewsletter: (id: number) =>
+    request<LinkedInNewsletterScrapeResult>(`/linkedin/newsletters/${id}/scrape`, {
+      method: 'POST',
+    }),
+  scrapeAllLinkedInNewsletters: () =>
+    request<LinkedInScrapeAllResult>('/linkedin/newsletters/scrape-all', { method: 'POST' }),
   listPosts: (status?: string) =>
     request<{ posts: PostSummary[] }>(
       status ? `/posts?status=${encodeURIComponent(status)}` : '/posts',
