@@ -104,7 +104,7 @@ export default function Dashboard() {
         <h3 className="text-sm font-semibold mb-2">Import image gallery (.zip)</h3>
         <p className="mb-2 text-xs text-slate-500">
           Upload a <code className="font-mono">.zip</code> of images (PNG, JPG, WebP, GIF) — each image becomes one block in the WordPress draft, in filename order.
-          Max 50 images, 25 MB.
+          Max 150 images, 100 MB.
         </p>
         <p className="mb-2 text-xs text-slate-500">
           <strong>For a PDF:</strong> open it in Preview / Acrobat → export each page as an image → zip the folder → upload here.

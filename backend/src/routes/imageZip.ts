@@ -4,8 +4,8 @@ import AdmZip from 'adm-zip';
 import { prisma } from '../db';
 import { uploadMedia } from '../wp/client';
 
-const MAX_IMAGES = Number(process.env.ZIP_MAX_IMAGES ?? 50);
-const MAX_BYTES = Number(process.env.ZIP_MAX_BYTES ?? 25 * 1024 * 1024); // 25 MB
+const MAX_IMAGES = Number(process.env.ZIP_MAX_IMAGES ?? 150);
+const MAX_BYTES = Number(process.env.ZIP_MAX_BYTES ?? 100 * 1024 * 1024); // 100 MB
 
 const IMAGE_EXT_TO_MIME: Record<string, string> = {
   '.png': 'image/png',
