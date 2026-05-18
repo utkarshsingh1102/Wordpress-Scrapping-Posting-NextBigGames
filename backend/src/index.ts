@@ -13,6 +13,7 @@ import cleanupRouter from './routes/cleanup';
 import imagegenRouter from './routes/imagegen';
 import sourcesRouter from './routes/sources';
 import imageZipRouter from './routes/imageZip';
+import linkedinRouter from './routes/linkedin';
 import { startScheduler } from './scheduler';
 import { autoMigrateFromEnv } from './services/settings';
 
@@ -32,6 +33,7 @@ app.use('/api', cleanupRouter);
 app.use('/api', imagegenRouter);
 app.use('/api', sourcesRouter);
 app.use('/api', imageZipRouter);
+app.use('/api', linkedinRouter);
 
 app.listen(config.port, async () => {
   console.log(`Backend listening on port ${config.port}`);

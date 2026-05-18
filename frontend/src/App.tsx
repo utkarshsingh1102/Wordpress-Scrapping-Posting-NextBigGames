@@ -3,10 +3,12 @@ import Dashboard from './pages/Dashboard';
 import Review from './pages/Review';
 import Settings from './pages/Settings';
 import Logs from './pages/Logs';
+import LinkedIn from './pages/LinkedIn';
 
 const navItems = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/review', label: 'Review' },
+  { to: '/linkedin', label: 'LinkedIn Newsletter' },
   { to: '/settings', label: 'Settings' },
   { to: '/logs', label: 'Logs' },
 ];
@@ -39,6 +41,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/review" element={<Review />} />
+          <Route path="/linkedin" element={<LinkedIn />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/logs" element={<Logs />} />
         </Routes>

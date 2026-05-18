@@ -44,6 +44,14 @@ model Source {
   posts         Post[]
 }
 
+model LinkedinNewsletter {
+  id            Int       @id @default(autoincrement())
+  name          String
+  url           String    @unique
+  lastScrapedAt DateTime?
+  createdAt     DateTime  @default(now())
+}
+
 model Job {
   id             Int       @id @default(autoincrement())
   type           String

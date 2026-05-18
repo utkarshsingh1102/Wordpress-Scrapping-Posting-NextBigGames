@@ -452,6 +452,14 @@ export default function Review() {
                       <div className="text-sm font-medium line-clamp-2">{p.title}</div>
                       <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
                         <StatusPill status={p.status} />
+                        {p.sourceName && (
+                          <span
+                            className="inline-block max-w-[10rem] truncate rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700"
+                            title={p.sourceName}
+                          >
+                            {p.sourceName}
+                          </span>
+                        )}
                         <span className="truncate">{p.author ?? '—'}</span>
                         <span>·</span>
                         <span>
