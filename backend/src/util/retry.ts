@@ -13,15 +13,18 @@ export type RetryOptions = {
   idempotent?: boolean;
 };
 
-const DEFAULT_ATTEMPTS = 3;
-const DEFAULT_BASE_DELAY_MS = 1000;
+const DEFAULT_ATTEMPTS = 4;
+const DEFAULT_BASE_DELAY_MS = 1500;
 
 function shouldRetry(err: unknown, idempotent: boolean): boolean {
   if (axios.isAxiosError(err)) {
     if (!err.response) return true;
-    if (!idempotent) return false;
     const s = err.response.status;
-    return s >= 500 || s === 408 || s === 429;
+    // 429 means the request was rejected by a rate limiter — the resource
+    // creation never ran, so retrying is safe even for non-idempotent POSTs.
+    if (s === 429) return true;
+    if (!idempotent) return false;
+    return s >= 500 || s === 408;
   }
   return idempotent;
 }

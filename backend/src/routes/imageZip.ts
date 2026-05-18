@@ -3,6 +3,7 @@ import multer from 'multer';
 import AdmZip from 'adm-zip';
 import { prisma } from '../db';
 import { uploadMedia } from '../wp/client';
+import { sleep } from '../util/retry';
 
 const MAX_IMAGES = Number(process.env.ZIP_MAX_IMAGES ?? 150);
 const MAX_BYTES = Number(process.env.ZIP_MAX_BYTES ?? 100 * 1024 * 1024); // 100 MB
@@ -87,29 +88,31 @@ router.post('/image-zip/upload', upload.single('file'), async (req, res) => {
       .replace(/[^a-z0-9_-]+/g, '-')
       .slice(0, 80) || 'gallery';
 
-  // Upload each image to WP in parallel. The position is preserved via the
-  // index — we re-sort after Promise.all so order doesn't depend on which
-  // upload finishes first.
-  let uploaded: Array<{ idx: number; sourceUrl: string }>;
+  // Sequential uploads with a small inter-request delay. Parallel uploads
+  // trip WP rate limiters (HTTP 429) on most managed hosts — they typically
+  // cap REST API at 5–10 req/sec. The withRetry wrapper inside uploadMedia()
+  // backs off on 429 if one slips through.
+  const interRequestDelayMs = Number(process.env.WP_UPLOAD_DELAY_MS ?? 300);
+  const uploaded: Array<{ idx: number; sourceUrl: string }> = [];
   try {
-    uploaded = await Promise.all(
-      entries.map(async (e, idx) => {
-        const buffer = e.entry.getData();
-        const media = await uploadMedia({
-          binary: buffer,
-          filename: `${slugBase}-${String(idx + 1).padStart(3, '0')}${e.ext}`,
-          mimeType: e.mime as string,
-        });
-        return { idx, sourceUrl: media.source_url };
-      }),
-    );
+    for (let idx = 0; idx < entries.length; idx++) {
+      const e = entries[idx];
+      const buffer = e.entry.getData();
+      const media = await uploadMedia({
+        binary: buffer,
+        filename: `${slugBase}-${String(idx + 1).padStart(3, '0')}${e.ext}`,
+        mimeType: e.mime as string,
+      });
+      uploaded.push({ idx, sourceUrl: media.source_url });
+      if (idx < entries.length - 1) await sleep(interRequestDelayMs);
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    res.status(502).json({ error: `WordPress media upload failed: ${msg}` });
+    res.status(502).json({
+      error: `WordPress media upload failed after ${uploaded.length}/${entries.length} images: ${msg}`,
+    });
     return;
   }
-
-  uploaded.sort((a, b) => a.idx - b.idx);
   const bodyHtml = uploaded
     .map(({ sourceUrl }) => `<p><img src="${sourceUrl}" alt="" /></p>`)
     .join('\n');
